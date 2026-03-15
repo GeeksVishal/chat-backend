@@ -149,6 +149,30 @@ app.get("/users/publickey/:uid", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get("/chats/last/:uid", async (req, res) => {
+  try {
+    const users = await User.find({ uid: { $ne: req.params.uid } });
+    const result = await Promise.all(users.map(async (user) => {
+      const sorted = [req.params.uid, user.uid].sort();
+      const chatId = `${sorted[0]}_${sorted[1]}`;
+      const lastMsg = await Message.findOne({ chatId })
+        .sort({ timestamp: -1 });
+      return {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        isOnline: user.isOnline,
+        lastMessage: lastMsg ? lastMsg.encryptedText : null,
+        lastMessageTime: lastMsg ? lastMsg.timestamp : null,
+        isRead: lastMsg ? lastMsg.isRead : true,
+      };
+    }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // Update online status
 app.put("/users/status/:uid", async (req, res) => {
   try {
