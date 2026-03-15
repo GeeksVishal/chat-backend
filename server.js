@@ -84,6 +84,18 @@ app.get("/messages/:chatId", async (req, res) => {
   }
 });
 
+app.delete("/messages/:messageId", async (req, res) => {
+  try {
+    await Message.findByIdAndDelete(req.params.messageId);
+    io.to(req.params.chatId).emit("messageDeleted", {
+      messageId: req.params.messageId
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Mark messages as read
 app.put("/messages/read/:chatId/:userId", async (req, res) => {
   try {
