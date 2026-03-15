@@ -6,23 +6,21 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(cors());
 app.use(express.json());
 
-// Connect MongoDB
 mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log("MongoDB Connected ✅"))
 .catch((err) => console.log("MongoDB Error:", err));
 
-// Schemas
 const userSchema = new mongoose.Schema({
   uid: { type: String, required: true, unique: true },
   email: { type: String, required: true },
   displayName: { type: String, required: true },
+  isOnline: { type: Boolean, default: false },
+  lastSeen: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -38,7 +36,7 @@ const messageSchema = new mongoose.Schema({
 const User = mongoose.model("User", userSchema);
 const Message = mongoose.model("Message", messageSchema);
 
-// REST Routes
+// Routes
 app.get("/", (req, res) => res.send("Backend is running ✅"));
 
 app.post("/users", async (req, res) => {
@@ -68,10 +66,7 @@ app.post("/messages", async (req, res) => {
     const { chatId, senderId, encryptedText, iv } = req.body;
     const message = new Message({ chatId, senderId, encryptedText, iv });
     await message.save();
-
-    // Emit to all users in this chat room instantly ⚡
     io.to(chatId).emit("newMessage", message);
-
     res.json(message);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -89,19 +84,49 @@ app.get("/messages/:chatId", async (req, res) => {
   }
 });
 
-// WebSocket Events
+// Mark messages as read
+app.put("/messages/read/:chatId/:userId", async (req, res) => {
+  try {
+    await Message.updateMany(
+      { chatId: req.params.chatId, senderId: { $ne: req.params.userId }, isRead: false },
+      { isRead: true }
+    );
+    io.to(req.params.chatId).emit("messagesRead", { chatId: req.params.chatId });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update online status
+app.put("/users/status/:uid", async (req, res) => {
+  try {
+    const { isOnline } = req.body;
+    await User.findOneAndUpdate(
+      { uid: req.params.uid },
+      { isOnline, lastSeen: Date.now() }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// WebSocket
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Join a chat room
   socket.on("joinChat", (chatId) => {
     socket.join(chatId);
-    console.log(`User joined chat: ${chatId}`);
   });
 
-  // Leave a chat room
   socket.on("leaveChat", (chatId) => {
     socket.leave(chatId);
+  });
+
+  // Typing indicator
+  socket.on("typing", ({ chatId, userId, isTyping }) => {
+    socket.to(chatId).emit("typingStatus", { userId, isTyping });
   });
 
   socket.on("disconnect", () => {
