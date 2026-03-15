@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   uid: { type: String, required: true, unique: true },
   email: { type: String, required: true },
   displayName: { type: String, required: true },
+  publicKey: { type: String, default: '' }, // ← RSA Public Key
   isOnline: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now },
@@ -27,8 +28,9 @@ const userSchema = new mongoose.Schema({
 const messageSchema = new mongoose.Schema({
   chatId: { type: String, required: true },
   senderId: { type: String, required: true },
-  encryptedText: { type: String, required: true },
-  iv: { type: String, required: true },
+  encryptedText: { type: String, required: true }, // AES encrypted message
+  iv: { type: String, required: true },             // AES IV
+  encryptedAESKey: { type: String, required: true }, // RSA encrypted AES key
   timestamp: { type: Date, default: Date.now },
   isRead: { type: Boolean, default: false },
 });
@@ -63,8 +65,14 @@ app.get("/users", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
   try {
-    const { chatId, senderId, encryptedText, iv } = req.body;
-    const message = new Message({ chatId, senderId, encryptedText, iv });
+    const { chatId, senderId, encryptedText, iv, encryptedAESKey } = req.body;
+    const message = new Message({
+      chatId,
+      senderId,
+      encryptedText,
+      iv,
+      encryptedAESKey,
+    });
     await message.save();
     io.to(chatId).emit("newMessage", message);
     res.json(message);
@@ -110,6 +118,28 @@ app.put("/messages/read/:chatId/:userId", async (req, res) => {
   }
 });
 
+app.put("/users/publickey/:uid", async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+    await User.findOneAndUpdate(
+      { uid: req.params.uid },
+      { publicKey }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get user public key
+app.get("/users/publickey/:uid", async (req, res) => {
+  try {
+    const user = await User.findOne({ uid: req.params.uid });
+    res.json({ publicKey: user?.publicKey || '' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // Update online status
 app.put("/users/status/:uid", async (req, res) => {
   try {
