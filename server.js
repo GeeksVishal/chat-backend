@@ -7,9 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect(
-  "mongodb+srv://vicky:vishal1234@flutter-e2e-chat.klxpgkv.mongodb.net/chatdb?retryWrites=true&w=majority"
-)
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://vicky:vishal2262@flutter-e2e-chat.klxpgkv.mongodb.net/chatdb?retryWrites=true&w=majority";
+
+mongoose.connect(MONGODB_URI)
 .then(() => {
   console.log("MongoDB Connected ✅");
 })
@@ -21,6 +21,6 @@ app.get("/", (req, res) => {
   res.send("Backend is running ✅");
 });
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000 ✅");
+app.listen(process.env.PORT || 5000, () => {
+  console.log("Server running ✅");
 });
