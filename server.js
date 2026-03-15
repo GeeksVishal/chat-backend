@@ -28,9 +28,10 @@ const userSchema = new mongoose.Schema({
 const messageSchema = new mongoose.Schema({
   chatId: { type: String, required: true },
   senderId: { type: String, required: true },
-  encryptedText: { type: String, required: true }, // AES encrypted message
-  iv: { type: String, required: true },             // AES IV
-  encryptedAESKey: { type: String, required: true }, // RSA encrypted AES key
+  encryptedText: { type: String, required: true },
+  iv: { type: String, required: true },
+  encryptedAESKey: { type: String, required: true },      // receiver's key
+  encryptedAESKeySender: { type: String, required: true }, // sender's key
   timestamp: { type: Date, default: Date.now },
   isRead: { type: Boolean, default: false },
 });
@@ -65,13 +66,21 @@ app.get("/users", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
   try {
-    const { chatId, senderId, encryptedText, iv, encryptedAESKey } = req.body;
+    const {
+      chatId,
+      senderId,
+      encryptedText,
+      iv,
+      encryptedAESKey,
+      encryptedAESKeySender,
+    } = req.body;
     const message = new Message({
       chatId,
       senderId,
       encryptedText,
       iv,
       encryptedAESKey,
+      encryptedAESKeySender,
     });
     await message.save();
     io.to(chatId).emit("newMessage", message);
