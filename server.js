@@ -1,8 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
+
 app.use(cors());
 app.use(express.json());
 
@@ -11,7 +18,7 @@ mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log("MongoDB Connected ✅"))
 .catch((err) => console.log("MongoDB Error:", err));
 
-// ── SCHEMAS ──
+// Schemas
 const userSchema = new mongoose.Schema({
   uid: { type: String, required: true, unique: true },
   email: { type: String, required: true },
@@ -31,14 +38,9 @@ const messageSchema = new mongoose.Schema({
 const User = mongoose.model("User", userSchema);
 const Message = mongoose.model("Message", messageSchema);
 
-// ── ROUTES ──
+// REST Routes
+app.get("/", (req, res) => res.send("Backend is running ✅"));
 
-// Test route
-app.get("/", (req, res) => {
-  res.send("Backend is running ✅");
-});
-
-// Save user after Firebase registration
 app.post("/users", async (req, res) => {
   try {
     const { uid, email, displayName } = req.body;
@@ -52,7 +54,6 @@ app.post("/users", async (req, res) => {
   }
 });
 
-// Get all users
 app.get("/users", async (req, res) => {
   try {
     const users = await User.find();
@@ -62,19 +63,21 @@ app.get("/users", async (req, res) => {
   }
 });
 
-// Send encrypted message
 app.post("/messages", async (req, res) => {
   try {
     const { chatId, senderId, encryptedText, iv } = req.body;
     const message = new Message({ chatId, senderId, encryptedText, iv });
     await message.save();
+
+    // Emit to all users in this chat room instantly ⚡
+    io.to(chatId).emit("newMessage", message);
+
     res.json(message);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get messages for a chat
 app.get("/messages/:chatId", async (req, res) => {
   try {
     const messages = await Message.find({
@@ -86,6 +89,26 @@ app.get("/messages/:chatId", async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 5000, () => {
+// WebSocket Events
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  // Join a chat room
+  socket.on("joinChat", (chatId) => {
+    socket.join(chatId);
+    console.log(`User joined chat: ${chatId}`);
+  });
+
+  // Leave a chat room
+  socket.on("leaveChat", (chatId) => {
+    socket.leave(chatId);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+});
+
+server.listen(process.env.PORT || 5000, () => {
   console.log("Server running ✅");
 });
