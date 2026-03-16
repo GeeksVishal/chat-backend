@@ -158,6 +158,14 @@ app.get("/chats/last/:uid", async (req, res) => {
       const chatId = `${sorted[0]}_${sorted[1]}`;
       const lastMsg = await Message.findOne({ chatId })
         .sort({ timestamp: -1 });
+
+      // Count unread messages sent by other user
+      const unreadCount = await Message.countDocuments({
+        chatId,
+        senderId: user.uid,
+        isRead: false,
+      });
+
       return {
         uid: user.uid,
         email: user.email,
@@ -165,7 +173,8 @@ app.get("/chats/last/:uid", async (req, res) => {
         isOnline: user.isOnline,
         lastMessage: lastMsg ? lastMsg.encryptedText : null,
         lastMessageTime: lastMsg ? lastMsg.timestamp : null,
-        isRead: lastMsg ? lastMsg.isRead : true,
+        isRead: unreadCount === 0,
+        unreadCount: unreadCount,
       };
     }));
     res.json(result);
