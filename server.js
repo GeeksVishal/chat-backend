@@ -28,10 +28,11 @@ const userSchema = new mongoose.Schema({
 const messageSchema = new mongoose.Schema({
   chatId: { type: String, required: true },
   senderId: { type: String, required: true },
-  encryptedText: { type: String, required: true },
-  iv: { type: String, required: true },
-  encryptedAESKey: { type: String, required: true },      // receiver's key
-  encryptedAESKeySender: { type: String, required: true }, // sender's key
+  messageType: { type: String, default: 'text' }, // text, image, audio
+  encryptedText: { type: String, default: '' },
+  iv: { type: String, default: '' },
+  encryptedAESKey: { type: String, default: '' },
+  encryptedAESKeySender: { type: String, default: '' },
   timestamp: { type: Date, default: Date.now },
   isRead: { type: Boolean, default: false },
 });
