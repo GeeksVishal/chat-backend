@@ -70,6 +70,7 @@ app.post("/messages", async (req, res) => {
     const {
       chatId,
       senderId,
+      messageType,
       encryptedText,
       iv,
       encryptedAESKey,
@@ -78,6 +79,7 @@ app.post("/messages", async (req, res) => {
     const message = new Message({
       chatId,
       senderId,
+      messageType: messageType || 'text',
       encryptedText,
       iv,
       encryptedAESKey,
